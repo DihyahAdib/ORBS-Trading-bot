@@ -461,10 +461,11 @@ if __name__ == "__main__":
         notification_service=notification_service
     )
     
+    #Test the bot here below this line----- append functions as needed
+    # test_discord_notification(discord_webhook, discord_role_id)
+    
+    # if email_config and email_config['from_email'] != 'your_email@gmail.com':
+    #     test_email_notification(email_config)
+    
     # Run the bot
     bot.run(check_interval=30)
-    
-    test_discord_notification(discord_webhook, discord_role_id)
-    
-    if email_config and email_config['from_email'] != 'your_email@gmail.com':
-        test_email_notification(email_config)
