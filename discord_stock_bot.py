@@ -13,6 +13,9 @@ import seaborn as sns
 import logging
 from typing import Optional, Dict, Any
 import pytz
+import os
+from dotenv import load_dotenv
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -434,31 +437,9 @@ async def help_command(interaction: discord.Interaction):
 # Run the bot
 if __name__ == "__main__":
     # Configuration
-    BOT_TOKEN = "MTQwMzU2NjM5Mzc2NDQ4MzEzOA.G1BzN_.9FU4MicsaINoqLTFCh0gaMaD9ovJ1uhO8EiwyA"  # Replace with your bot token
+    BOT_TOKEN = os.getenv("DISCORD_TOKEN")
     
-    print("🤖 Starting Discord Stock Bot...")
-    print("Make sure to:")
-    print("1. Create a Discord application at https://discord.com/developers/applications")
-    print("2. Create a bot and get the token")
-    print("3. Invite the bot to your server with 'applications.commands' scope")
-    print("4. Replace YOUR_BOT_TOKEN_HERE with your actual bot token")
-    print()
-    
-    # Install required packages reminder
-    required_packages = [
-        "discord.py",
-        "yfinance", 
-        "pandas",
-        "matplotlib",
-        "seaborn",
-        "pytz"
-    ]
-    
-    print("📦 Required packages:")
-    print(f"pip install {' '.join(required_packages)}")
-    print()
-    
-    if BOT_TOKEN == "YOUR_BOT_TOKEN_HERE":
+    if not BOT_TOKEN:
         print("❌ Please set your bot token before running!")
     else:
         try:
