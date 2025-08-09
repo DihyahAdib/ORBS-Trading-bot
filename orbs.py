@@ -400,7 +400,7 @@ def test_discord_notification(discord_webhook, discord_role_id = None):
     print("Testing Discord notification...")
     notification_service = NotificationService(discord_webhook=discord_webhook, discord_role_id=discord_role_id)
     notification_service.send_discord_notification(
-        "🧪 **ORBS Bot Test** - Rise and shine @TRADERS Lets make some money!", discord_role_id
+        "🧪 **ORBS Bot Test** - Rise and shine Lets make some money!", discord_role_id
     )
     print("Test Discord message sent!")
 
@@ -447,7 +447,7 @@ if __name__ == "__main__":
     }
     
     discord_webhook = "https://discord.com/api/webhooks/1403537739428659353/DYZ7pc02DQt9ponJVmTj2xmf8NX7gNvjXd8AKTWWzfyX5wEs1o7dxQMxJwIjdQhmfcWm"
-    discord_role_id = 1402622141370863629
+    discord_role_id = "1402622141370863629"
     # Initialize notification service
     notification_service = NotificationService(
         email_config=email_config,
@@ -464,7 +464,7 @@ if __name__ == "__main__":
     # Run the bot
     bot.run(check_interval=30)
     
-    test_discord_notification(discord_webhook)
+    test_discord_notification(discord_webhook, discord_role_id)
     
     if email_config and email_config['from_email'] != 'your_email@gmail.com':
         test_email_notification(email_config)
