@@ -13,6 +13,9 @@ from dataclasses import dataclass
 from typing import Optional, Tuple, List
 import logging
 from typing import cast
+import os
+from dotenv import load_dotenv
+load_dotenv()
 
 # Configure Logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -443,11 +446,11 @@ if __name__ == "__main__":
         'smtp_port': 587,
         'from_email': 'orbstradingbot@gmail.com',
         'password': 'avzb mtfv voer psts',
-        'to_email': 'dihyah.adib@gmail.com'
+        'to_email': ['dihyah.adib@gmail.com', 'Muhammad242m@gmail.com', 'ayat25541234@gmail.com']
     }
     
-    discord_webhook = "https://discord.com/api/webhooks/1403537739428659353/DYZ7pc02DQt9ponJVmTj2xmf8NX7gNvjXd8AKTWWzfyX5wEs1o7dxQMxJwIjdQhmfcWm"
-    discord_role_id = "1402622141370863629"
+    discord_webhook = os.getenv("DISCORD_WEBHOOK")
+    discord_role_id = os.getenv("DISCORD_ROLE_ID")
     # Initialize notification service
     notification_service = NotificationService(
         email_config=email_config,
@@ -461,7 +464,7 @@ if __name__ == "__main__":
         notification_service=notification_service
     )
     
-    #Test the bot here below this line----- append functions as needed
+    #Test the bot here below this line ----- append functions as needed
     # test_discord_notification(discord_webhook, discord_role_id)
     
     # if email_config and email_config['from_email'] != 'your_email@gmail.com':

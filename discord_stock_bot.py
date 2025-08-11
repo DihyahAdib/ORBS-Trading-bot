@@ -103,7 +103,6 @@ class StockData:
     
     @staticmethod
     def create_price_chart(symbol: str, period: str = '1d') -> Optional[io.BytesIO]:
-        """Create a beautiful price chart with a more modern style."""
         try:
             ticker = yf.Ticker(symbol)
 
@@ -141,13 +140,11 @@ class StockData:
 
             # Price line plot
             ax.plot(data.index, data['Close'], color=line_color, linewidth=2.5, label='Price')
-            
-            # Gradient fill under the price line
+
             ax.fill_between(data.index, data['Close'], data['Close'].min(),
                             where=data['Close'] >= data['Close'].min(), interpolate=True,
                             color=fill_color_start, alpha=0.3)
 
-            # Draw a line at the last closing price for reference
             ax.axhline(y=start_price, color='#ffffff', linestyle='--', linewidth=1, alpha=0.5, label='Start Price')
 
             # Volume bars on a secondary axis
@@ -208,8 +205,6 @@ class StockData:
             return None
 
 class StockBot(commands.Bot):
-    """Discord bot for stock data"""
-    
     def __init__(self):
         intents = discord.Intents.default()
         intents.message_content = True
