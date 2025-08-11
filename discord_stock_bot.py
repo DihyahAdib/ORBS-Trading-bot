@@ -17,10 +17,8 @@ import os
 from dotenv import load_dotenv
 load_dotenv()
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 
-# Set up matplotlib for better-looking plots
 plt.style.use('dark_background')
 sns.set_palette("husl")
 
@@ -32,34 +30,26 @@ class StockData:
         """Get comprehensive stock information"""
         try:
             ticker = yf.Ticker(symbol.upper())
-            
-            # Get basic info
+
             info = ticker.info
-            
-            # Get recent data
+
             hist_1d = ticker.history(period='1d', interval='1m')
             hist_5d = ticker.history(period='5d', interval='15m')
             
             if hist_1d.empty and hist_5d.empty:
                 return None
-            
-            # Use the most recent data available
+
             current_data = hist_1d if not hist_1d.empty else hist_5d
-            
-            # Get current price (last available)
+
             current_price = current_data['Close'].iloc[-1] if not current_data.empty else info.get('currentPrice', 0)
-            
-            # Get previous close for change calculation
+
             previous_close = info.get('previousClose', current_price)
-            
-            # Calculate change
+
             price_change = current_price - previous_close
             percent_change = (price_change / previous_close) * 100 if previous_close != 0 else 0
-            
-            # Determine market session
+
             market_session = StockData.get_market_session()
-            
-            # Get additional stats
+
             day_high = current_data['High'].max() if not current_data.empty else info.get('dayHigh', current_price)
             day_low = current_data['Low'].min() if not current_data.empty else info.get('dayLow', current_price)
             volume = current_data['Volume'].sum() if not current_data.empty else info.get('volume', 0)
@@ -91,19 +81,15 @@ class StockData:
         now = datetime.now(pytz.timezone('US/Eastern'))
         current_time = now.time()
         weekday = now.weekday()
-        
-        # Weekend
-        if weekday >= 5:  # Saturday = 5, Sunday = 6
+
+        if weekday >= 5: 
             return "Weekend (Market Closed)"
-        
-        # Market hours (9:30 AM - 4:00 PM ET)
+
         market_open = datetime.strptime("09:30", "%H:%M").time()
         market_close = datetime.strptime("16:00", "%H:%M").time()
-        
-        # Pre-market (4:00 AM - 9:30 AM ET)
+
         premarket_start = datetime.strptime("04:00", "%H:%M").time()
-        
-        # After-hours (4:00 PM - 8:00 PM ET)
+
         afterhours_end = datetime.strptime("20:00", "%H:%M").time()
         
         if market_open <= current_time <= market_close:
@@ -117,13 +103,13 @@ class StockData:
     
     @staticmethod
     def create_price_chart(symbol: str, period: str = '1d') -> Optional[io.BytesIO]:
-        """Create a price chart for the stock"""
+        """Create a beautiful price chart with a more modern style."""
         try:
             ticker = yf.Ticker(symbol)
-            
-            # Determine interval based on period
+
+            # Set data interval based on period
             if period == '1d':
-                data = ticker.history(period='1d', interval='5m')
+                data = ticker.history(period='1d', interval='1m')
                 title_period = "Today"
             elif period == '5d':
                 data = ticker.history(period='5d', interval='15m')
@@ -131,73 +117,92 @@ class StockData:
             elif period == '1mo':
                 data = ticker.history(period='1mo', interval='1h')
                 title_period = "1 Month"
-            else:
+            elif period == '3mo':
                 data = ticker.history(period='3mo', interval='1d')
                 title_period = "3 Months"
-            
+            else:
+                return None # Invalid period
+
             if data.empty:
                 return None
+
+            # Determine price direction for color
+            current_price = data['Close'].iloc[-1]
+            start_price = data['Close'].iloc[0]
+            price_change_dir = 'up' if current_price >= start_price else 'down'
+            line_color = '#00ff7f' if price_change_dir == 'up' else '#ff4d4d'
+            fill_color_start = '#00ff7f33' if price_change_dir == 'up' else '#ff4d4d33'
+            fill_color_end = '#2f3136'
+
+            # Set up the plot
+            plt.style.use('dark_background')
+            fig, ax = plt.subplots(figsize=(14, 7), facecolor='#2f3136')
+            ax.set_facecolor('#2f3136')
+
+            # Price line plot
+            ax.plot(data.index, data['Close'], color=line_color, linewidth=2.5, label='Price')
             
-            # Create the plot
-            fig, ax = plt.subplots(figsize=(12, 8))
-            fig.patch.set_facecolor('#2f3136')
-            ax.set_facecolor('#36393f')
-            
-            # Plot the price line
-            ax.plot(data.index, data['Close'], color='#00d4aa', linewidth=2, label='Price')
-            
-            # Fill area under the curve
-            ax.fill_between(data.index, data['Close'], alpha=0.3, color='#00d4aa')
-            
-            # Add volume subplot
+            # Gradient fill under the price line
+            ax.fill_between(data.index, data['Close'], data['Close'].min(),
+                            where=data['Close'] >= data['Close'].min(), interpolate=True,
+                            color=fill_color_start, alpha=0.3)
+
+            # Draw a line at the last closing price for reference
+            ax.axhline(y=start_price, color='#ffffff', linestyle='--', linewidth=1, alpha=0.5, label='Start Price')
+
+            # Volume bars on a secondary axis
             ax2 = ax.twinx()
-            ax2.bar(data.index, data['Volume'], alpha=0.3, color='#7289da', width=0.0008)
-            ax2.set_ylabel('Volume', color='#7289da')
-            ax2.tick_params(axis='y', labelcolor='#7289da')
-            
-            # Formatting
-            ax.set_title(f'{symbol.upper()} - {title_period}', fontsize=16, color='white', fontweight='bold')
-            ax.set_xlabel('Time', color='white')
-            ax.set_ylabel('Price ($)', color='white')
-            
-            # Format x-axis
+            ax2.bar(data.index, data['Volume'], color=line_color, alpha=0.3, width=0.0008, label='Volume')
+            ax2.set_ylabel('Volume', color=line_color, fontsize=12)
+            ax2.tick_params(axis='y', labelcolor=line_color)
+            ax2.set_ylim(0, data['Volume'].max() * 3) # Make volume bars smaller
+            ax2.grid(False)
+
+            # Title and labels
+            ax.set_title(f'Price Chart for {symbol.upper()} ({title_period})', fontsize=20, color='white', fontweight='bold')
+            ax.set_xlabel('Time', fontsize=12, color='white')
+            ax.set_ylabel('Price ($)', fontsize=12, color='white')
+
+            # Axis styling
+            ax.tick_params(axis='x', colors='white', labelsize=10)
+            ax.tick_params(axis='y', colors='white', labelsize=10)
+            ax.spines['bottom'].set_color('white')
+            ax.spines['left'].set_color('white')
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+
+            # Format the x-axis for better readability
             if period == '1d':
                 ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
-                ax.xaxis.set_major_locator(mdates.HourLocator(interval=2))
             else:
-                ax.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d'))
+                ax.xaxis.set_major_formatter(mdates.DateFormatter('%b %d'))
+
+            plt.xticks(rotation=45, ha='right')
+            ax.grid(True, linestyle='--', alpha=0.2)
+
+            # Info box with price change
+            price_change = current_price - start_price
+            percent_change = (price_change / start_price) * 100 if start_price != 0 else 0
             
-            # Rotate x-axis labels
-            plt.xticks(rotation=45)
+            change_symbol = '▲' if price_change >= 0 else '▼'
+            change_text = f'{change_symbol} {abs(price_change):.2f} ({abs(percent_change):.2f}%)'
             
-            # Grid
-            ax.grid(True, alpha=0.3, color='white')
+            info_text = f'Current Price: ${current_price:.2f}\nChange: {change_text}'
             
-            # Price info
-            current_price = data['Close'].iloc[-1]
-            price_change = current_price - data['Close'].iloc[0]
-            percent_change = (price_change / data['Close'].iloc[0]) * 100
-            
-            # Add price info text
-            color = '#00ff41' if price_change >= 0 else '#ff4757'
-            change_symbol = '+' if price_change >= 0 else ''
-            
-            info_text = f'${current_price:.2f} ({change_symbol}${price_change:.2f}, {change_symbol}{percent_change:.2f}%)'
-            ax.text(0.02, 0.98, info_text, transform=ax.transAxes, fontsize=12, 
-                   color=color, fontweight='bold', verticalalignment='top',
-                   bbox=dict(boxstyle='round', facecolor='black', alpha=0.8))
-            
-            # Tight layout
+            bbox_props = dict(boxstyle='round,pad=0.5', facecolor='#1e1e1e', alpha=0.9, edgecolor='none')
+            ax.text(0.02, 0.95, info_text, transform=ax.transAxes, fontsize=14, color=line_color,
+                    fontweight='bold', verticalalignment='top', bbox=bbox_props)
+
             plt.tight_layout()
             
-            # Save to BytesIO
+            # Save to buffer
             buffer = io.BytesIO()
-            plt.savefig(buffer, format='PNG', facecolor='#2f3136', dpi=150, bbox_inches='tight')
+            plt.savefig(buffer, format='png', facecolor='#2f3136')
             buffer.seek(0)
-            plt.close()
+            plt.close(fig)
             
             return buffer
-            
+
         except Exception as e:
             logging.error(f"Error creating chart for {symbol}: {e}")
             return None
@@ -212,8 +217,7 @@ class StockBot(commands.Bot):
     
     async def on_ready(self):
         print(f'{self.user} has connected to Discord!')
-        
-        # Sync slash commands
+
         try:
             synced = await self.tree.sync()
             print(f'Synced {len(synced)} command(s)')
@@ -225,7 +229,6 @@ class StockBot(commands.Bot):
             return
         print(f'Error: {error}')
 
-# Create bot instance
 bot = StockBot()
 
 @bot.tree.command(name="price", description="Get current stock price and basic info")
@@ -239,15 +242,13 @@ async def price_command(interaction: discord.Interaction, symbol: str):
         if not stock_data:
             await interaction.followup.send(f"❌ Could not find data for symbol: {symbol.upper()}")
             return
-        
-        # Create embed
+
         embed = discord.Embed(
             title=f"📈 {stock_data['symbol']} - {stock_data['company_name']}",
             color=0x00ff41 if stock_data['price_change'] >= 0 else 0xff4757,
             timestamp=datetime.now()
         )
-        
-        # Price info
+
         change_emoji = "📈" if stock_data['price_change'] >= 0 else "📉"
         change_symbol = "+" if stock_data['price_change'] >= 0 else ""
         
@@ -268,8 +269,7 @@ async def price_command(interaction: discord.Interaction, symbol: str):
             value=f"${stock_data['previous_close']:.2f}",
             inline=True
         )
-        
-        # Volume and market cap
+
         if stock_data['volume']:
             volume_formatted = f"{stock_data['volume']:,}"
             embed.add_field(name="📊 Volume", value=volume_formatted, inline=True)
@@ -280,8 +280,7 @@ async def price_command(interaction: discord.Interaction, symbol: str):
         
         if stock_data['pe_ratio']:
             embed.add_field(name="📈 P/E Ratio", value=f"{stock_data['pe_ratio']:.2f}", inline=True)
-        
-        # Market session
+
         embed.add_field(
             name="🕐 Market Status",
             value=stock_data['market_session'],
@@ -306,17 +305,14 @@ async def chart_command(interaction: discord.Interaction, symbol: str, period: s
         return
     
     try:
-        # Create chart
         chart_buffer = StockData.create_price_chart(symbol, period)
         
         if not chart_buffer:
             await interaction.followup.send(f"❌ Could not create chart for {symbol.upper()}")
             return
         
-        # Create file
         file = discord.File(chart_buffer, filename=f"{symbol.upper()}_{period}_chart.png")
-        
-        # Get basic stock info for embed
+
         stock_data = StockData.get_stock_info(symbol)
         
         if stock_data:
@@ -434,9 +430,7 @@ async def help_command(interaction: discord.Interaction):
     
     await interaction.response.send_message(embed=embed)
 
-# Run the bot
 if __name__ == "__main__":
-    # Configuration
     BOT_TOKEN = os.getenv("DISCORD_TOKEN")
     
     if not BOT_TOKEN:
