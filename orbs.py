@@ -427,7 +427,14 @@ class ORBSTradingBot:
         except Exception as e:
             logging.error(f"Unexpected error: {e}")
             raise
-        
+
+# def test_discord_notification(discord_webhook, discord_role_id = None):
+#     print("Testing Discord notification...")
+#     notification_service = NotificationService(discord_webhook=discord_webhook, discord_role_id=discord_role_id)
+#     notification_service.send_discord_notification(
+#         "🧪 **ORBS Bot Test** - Rise and shine Lets make some money!", discord_role_id
+#     )
+#     print("Test Discord message sent!")  
 if __name__ == "__main__":
     
     SYMBOLS = ["SPY"] 
@@ -447,7 +454,7 @@ if __name__ == "__main__":
         email_config=email_config,
         discord_webhook=discord_webhook
     )
-    
+    # test_discord_notification(discord_webhook, discord_role_id)
     bot = ORBSTradingBot(
         symbols=SYMBOLS,
         orb_minutes=30,  # 15-minute opening range
