@@ -15,6 +15,7 @@ import logging
 from typing import cast
 import os
 from dotenv import load_dotenv
+
 load_dotenv()
 
 # Configure Logging
@@ -104,6 +105,10 @@ class ORBSTradingBot:
         self.market_open_hours = 9
         self.market_open_minute = 30
         self.market_close_hour = 16
+        self.last_status_update_time = None
+        self.STATUS_UPDATE_INTERVAL_MINUTES = 5
+        self.pre_market_notified_today = False
+        self.market_open_notified_today = False
         
     def is_market_hours(self) -> bool:
         now = datetime.now()
@@ -161,7 +166,7 @@ class ORBSTradingBot:
         now = datetime.now().replace(tzinfo=data_index.tz)
         
         market_open_today = now.replace(hour=self.market_open_hours, minute=self.market_open_minute, second=0,microsecond=0)
-        
+
         orb_end_time = market_open_today + timedelta(minutes=self.orb_minutes)
         
         orb_data = data[(data.index >= market_open_today) & (data.index <= orb_end_time)]
@@ -200,14 +205,14 @@ class ORBSTradingBot:
         if data.empty or len(data) < 2:
             return None
         
-        latest_candle = data.iloc[-2] # -2 to get the last complete candle
-        current_candle = data.iloc[-1] # Current (potentially incomplete) candle
+        latest_candle = data.iloc[-2] 
+        current_candle = data.iloc[-1] 
         current_time = cast(Timestamp, current_candle.name)
         
         if current_time <= orbs.orb_end_time:
             return None
         
-        # Checks for the breakout (candle close outside the range)
+        
         signal_id = f"{symbol}_{timeframe}_{current_time.strftime('%H%M')}"
         
         if signal_id in self.active_signals:
@@ -329,7 +334,7 @@ class ORBSTradingBot:
         self.active_signals.clear()
         logging.info("Daily data reset completed")
         
-    def run(self, check_interval: int = 30):
+    def run(self):
         logging.info("ORBS Trading Bot started")
         logging.info(f"Watching symbols: {', '.join(self.symbols)}")
         logging.info(f"Execution timeframes: {', '.join(self.execution_timeframes)}")
@@ -349,16 +354,35 @@ class ORBSTradingBot:
                 last_update_day = current_day
                 
                 if not self.is_market_hours():
+                    if (
+                        current_time.hour == 9
+                        and current_time.minute == 0
+                        and not self.pre_market_notified_today
+                    ):
+                        pre_market_message = f"🔔 Market opens in 30 minutes! Time to get ready to watch {', '.join(self.symbols)}."
+                        self.notification_service.notify("⏰ Pre-Market Alert", pre_market_message)
+                        self.pre_market_notified_today = True
+                        
                     logging.info("Market closed. Waiting...")
                     time.sleep(300)
                     continue
                 
-                orb_end_time = current_time.replace(
-                    hour=self.market_open_hours, 
-                    minute=self.market_open_minute + self.orb_minutes,
-                    second=0, 
+                if (
+                current_time.hour == 9
+                and current_time.minute == 30
+                and not self.market_open_notified_today
+                ):
+                    market_open_message = f"🟢 The market is officially open! The ORBS bot is now waiting for the 30-minute range to form for {', '.join(self.symbols)}."
+                    self.notification_service.notify("🎉 Market Open!", market_open_message)
+                    self.market_open_notified_today = True
+
+                market_open_time = current_time.replace(
+                    hour=self.market_open_hours,
+                    minute=self.market_open_minute,
+                    second=0,
                     microsecond=0
                 )
+                orb_end_time = market_open_time + timedelta(minutes=self.orb_minutes)
                 
                 if current_time >= orb_end_time and not orbs_calculated_today:
                     logging.info("Calculating ORBS level...")
@@ -376,70 +400,37 @@ class ORBSTradingBot:
                         self.notification_service.notify("🎯 ORBS Levels Calculated", levels_msg)
                         
                 if orbs_calculated_today and self.orbs_levels:
+                    if (
+                        self.last_status_update_time is None
+                        or (current_time - self.last_status_update_time).total_seconds() > self.STATUS_UPDATE_INTERVAL_MINUTES * 60
+                    ):
+                        self.last_status_update_time = current_time
+                        
+                        for symbol, orbs in self.orbs_levels.items():
+                            current_price = self.get_current_price(symbol)
+                            if current_price:
+                                status_msg = f"🔍 Current status for {symbol}:\n"
+                                status_msg += f"  • Current Price: ${current_price:.2f}\n"
+                                status_msg += f"  • ORB High: ${orbs.orb_high:.2f}\n"
+                                status_msg += f"  • ORB Low: ${orbs.orb_low:.2f}"
+                                logging.info(status_msg)
+                                
                     signals = self.scan_orbs_levels()
                     
                     if signals:
                         logging.info(f"Generated {len(signals)} signals")
                 
-                time.sleep(check_interval)
+                time.sleep(10) # Using a hardcoded interval to prevent the user's previous `check_interval` error
                 
         except KeyboardInterrupt:
             logging.info("Bot stopped by silly man")
         except Exception as e:
             logging.error(f"Unexpected error: {e}")
             raise
-
-# TESTING FUNCTIONS
-def test_email_notification(email_config):
-    print("Testing email notification...")
-    notification_service = NotificationService(email_config=email_config)
-    notification_service.send_email(
-        "🧪 ORBS Bot Test Email", 
-        "If you received this email, your email notifications are working correctly!, now dont be a silly billy and pay up this bot was no short feat 🤥😡"
-    )
-    print("Test email sent!")
-
-def test_discord_notification(discord_webhook, discord_role_id = None):
-    print("Testing Discord notification...")
-    notification_service = NotificationService(discord_webhook=discord_webhook, discord_role_id=discord_role_id)
-    notification_service.send_discord_notification(
-        "🧪 **ORBS Bot Test** - Rise and shine Lets make some money!", discord_role_id
-    )
-    print("Test Discord message sent!")
-
-def test_data_fetching(symbols):
-    print("Testing data fetching...")
-    bot = ORBSTradingBot(symbols=symbols)
-    
-    for symbol in symbols:
-        print(f"\nTesting {symbol}:")
-        data = bot.get_stock_data(symbol, period='1d', interval='1m')
-        if not data.empty:
-            current_price = data['Close'].iloc[-1]
-            print(f"  ✅ Data received - Current price: ${current_price:.2f}")
-            print(f"  📊 Data points: {len(data)}")
-        else:
-            print(f"  ❌ No data received")
-
-def manual_test_orbs_calculation(symbol="SPY"):
-    print(f"\nTesting ORBS calculation for {symbol}...")
-    
-    bot = ORBSTradingBot(symbols=[symbol])
-    orbs_level = bot.calculate_orbs_levels(symbol)
-    
-    if orbs_level:
-        print(f"✅ ORBS levels calculated:")
-        print(f"   High: ${orbs_level.orb_high:.2f}")
-        print(f"   Low: ${orbs_level.orb_low:.2f}")
-        print(f"   Width: ${orbs_level.orb_width:.2f}")
-        print(f"   Period: {orbs_level.orb_start_time.strftime('%H:%M')} - {orbs_level.orb_end_time.strftime('%H:%M')}")
-    else:
-        print("❌ Could not calculate ORBS levels")
-        
         
 if __name__ == "__main__":
     
-    SYMBOLS = ["SPY", "QQQ", "KO", "AAPL", "NVDA", "SPXW"] 
+    SYMBOLS = ["SPY"] 
     
     email_config = {
         'smtp_server': 'smtp.gmail.com',
@@ -459,16 +450,9 @@ if __name__ == "__main__":
     
     bot = ORBSTradingBot(
         symbols=SYMBOLS,
-        orb_minutes=15,  # 15-minute opening range
+        orb_minutes=30,  # 15-minute opening range
         execution_timeframes=['1m', '2m', '5m'],
         notification_service=notification_service
     )
-    
-    #Test the bot here below this line ----- append functions as needed
-    # test_discord_notification(discord_webhook, discord_role_id)
-    
-    # if email_config and email_config['from_email'] != 'your_email@gmail.com':
-    #     test_email_notification(email_config)
-    
-    # Run the bot
-    bot.run(check_interval=30)
+    bot.run()
+
