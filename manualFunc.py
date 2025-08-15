@@ -8,14 +8,6 @@
 #     )
 #     print("Test email sent!")
 
-# def test_discord_notification(discord_webhook, discord_role_id = None):
-#     print("Testing Discord notification...")
-#     notification_service = NotificationService(discord_webhook=discord_webhook, discord_role_id=discord_role_id)
-#     notification_service.send_discord_notification(
-#         "🧪 **ORBS Bot Test** - Rise and shine Lets make some money!", discord_role_id
-#     )
-#     print("Test Discord message sent!")
-
 # def test_data_fetching(symbols):
 #     print("Testing data fetching...")
 #     bot = ORBSTradingBot(symbols=symbols)
